@@ -10,6 +10,20 @@ const isLoading = ref(true);
 const selectedCategory = ref('');
 const searchQuery = ref('');
 
+onMounted(async () => {
+  try {
+    const [productsResponse] = await Promise.all([
+      productApi.getProducts(),
+    ]);
+    
+    products.value = productsResponse.data;
+    isLoading.value = false;
+  } catch (error) {
+    console.error('獲取數據失敗:', error);
+    isLoading.value = false;
+  }
+});
+
 // 監聽路由參數變化
 watch(() => route.query.category, (newCategory) => {
   if (newCategory) {
@@ -38,22 +52,6 @@ const filteredProducts = computed(() => {
   }
   
   return result;
-});
-
-onMounted(async () => {
-  try {
-    const [productsResponse, categoriesResponse] = await Promise.all([
-      productApi.getProducts(),
-      productApi.getCategories()
-    ]);
-    
-    products.value = productsResponse.data;
-    categories.value = categoriesResponse.data;
-    isLoading.value = false;
-  } catch (error) {
-    console.error('獲取數據失敗:', error);
-    isLoading.value = false;
-  }
 });
 </script>
 
@@ -115,8 +113,6 @@ onMounted(async () => {
         <img :src="product.firstPhoto" :alt="product.name" class="w-full h-48 object-cover">
         <div class="p-4">
           <h2 class="text-lg font-semibold mb-2">{{ product.name }}</h2>
-          <p class="text-gray-600 mb-2 line-clamp-2">{{ product.description }}</p>
-          <p class="text-blue-600 mb-2">分類: {{ product.category }}</p>
           <p class="font-bold text-xl mb-3">${{ product.price.toLocaleString() }}</p>
           <div class="flex justify-between">
             <RouterLink 

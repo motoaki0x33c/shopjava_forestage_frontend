@@ -9,13 +9,11 @@ const isLoading = ref(true);
 
 onMounted(async () => {
   try {
-    const [productsResponse, categoriesResponse] = await Promise.all([
+    const [productsResponse] = await Promise.all([
       productApi.getProducts(),
-      productApi.getCategories()
     ]);
     
     featuredProducts.value = productsResponse.data.slice(0, 3); // 只顯示前3個商品
-    categories.value = categoriesResponse.data;
     isLoading.value = false;
   } catch (error) {
     console.error('獲取數據失敗:', error);
@@ -78,7 +76,6 @@ onMounted(async () => {
           <img :src="product.firstPhoto" :alt="product.name" class="w-full h-48 object-cover">
           <div class="p-4">
             <h3 class="text-lg font-semibold mb-2">{{ product.name }}</h3>
-            <p class="text-gray-600 mb-2 line-clamp-2">{{ product.description }}</p>
             <p class="font-bold text-xl mb-3">${{ product.price.toLocaleString() }}</p>
             <RouterLink 
               :to="`/product/${product.route}`" 

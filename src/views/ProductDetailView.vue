@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRoute, RouterLink } from 'vue-router';
 import productApi from '@/api/productApi';
 
@@ -20,13 +20,13 @@ const decreaseQuantity = () => {
   }
 };
 
-onMounted(async () => {
+// 獲取商品資料的函數
+const fetchProductData = async (routeParam) => {
   try {
     isLoading.value = true;
-    const productRoute = route.params.route;
     
     // 獲取商品詳情
-    const response = await productApi.getProduct(productRoute);
+    const response = await productApi.getProduct(routeParam);
     product.value = response.data;
     
     if (product.value) {
@@ -42,7 +42,15 @@ onMounted(async () => {
     console.error('獲取商品詳情失敗:', error);
     isLoading.value = false;
   }
-});
+};
+
+// 監聽路由參數變化，當路由變化時重新獲取商品資料
+watch(() => route.params.route, (newRoute) => {
+  if (newRoute) {
+    fetchProductData(newRoute);
+  }
+}, { immediate: true });
+
 </script>
 
 <template>
@@ -85,7 +93,6 @@ onMounted(async () => {
           <!-- 商品資訊 -->
           <div class="md:w-1/2 p-6">
             <h1 class="text-3xl font-bold mb-4">{{ product.name }}</h1>
-            <p class="text-gray-600 mb-4">{{ product.description }}</p>
             <p class="text-blue-600 mb-4">分類: {{ product.category }}</p>
             <p class="text-3xl font-bold text-red-600 mb-6">${{ product.price.toLocaleString() }}</p>
             
@@ -128,6 +135,11 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+
+      <h2 class="text-2xl font-semibold mb-6">商品介紹</h2>
+      <div class="bg-white rounded-lg shadow-lg overflow-hidden mb-10 justify-items-center">
+        <div v-html="product.description"></div>
+      </div>
       
       <!-- 相關商品 -->
       <div v-if="relatedProducts.length > 0" class="mb-10">
@@ -138,13 +150,12 @@ onMounted(async () => {
             :key="item.id" 
             class="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition duration-300"
           >
-            <img :src="item.image" :alt="item.name" class="w-full h-48 object-cover">
+            <img :src="item.firstPhoto" :alt="item.name" class="w-full h-48 object-cover">
             <div class="p-4">
               <h3 class="text-lg font-semibold mb-2">{{ item.name }}</h3>
-              <p class="text-gray-600 mb-2 line-clamp-2">{{ item.description }}</p>
               <p class="font-bold text-xl mb-3">${{ item.price.toLocaleString() }}</p>
               <RouterLink 
-                :to="`/product/${item.id}`" 
+                :to="`/product/${item.route}`" 
                 class="block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-300"
               >
                 查看詳情
