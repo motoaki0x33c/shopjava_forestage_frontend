@@ -2,12 +2,18 @@
 import { ref, onMounted, watch } from 'vue';
 import { useRoute, RouterLink } from 'vue-router';
 import productApi from '@/api/productApi';
+import { useCart } from '@/composables/useCart';
 
 const route = useRoute();
 const product = ref(null);
 const isLoading = ref(true);
 const quantity = ref(1);
 const relatedProducts = ref([]);
+const addingToCart = ref(false);
+const cartMessage = ref({ text: '', type: '' });
+
+// 使用共享的購物車邏輯
+const { addToCart: addProductToCart } = useCart();
 
 // 數量增減函數
 const increaseQuantity = () => {
@@ -41,6 +47,41 @@ const fetchProductData = async (routeParam) => {
   } catch (error) {
     console.error('獲取商品詳情失敗:', error);
     isLoading.value = false;
+  }
+};
+
+// 加入購物車功能
+const addToCart = async () => {
+  if (!product.value) return;
+  
+  try {
+    addingToCart.value = true;
+    cartMessage.value = { text: '', type: '' };
+    
+    // 使用共享的購物車函數添加商品
+    const result = await addProductToCart(product.value.id, quantity.value);
+    
+    if (result.success) {
+      cartMessage.value = {
+        text: `成功加入 ${quantity.value} 件商品到購物車`,
+        type: 'success'
+      };
+    } else {
+      throw new Error('加入購物車失敗');
+    }
+    
+    // 3秒後清除消息
+    setTimeout(() => {
+      cartMessage.value = { text: '', type: '' };
+    }, 3000);
+  } catch (error) {
+    console.error('加入購物車失敗:', error);
+    cartMessage.value = {
+      text: '加入購物車失敗，請稍後再試',
+      type: 'error'
+    };
+  } finally {
+    addingToCart.value = false;
   }
 };
 
@@ -80,6 +121,14 @@ watch(() => route.params.route, (newRoute) => {
         <RouterLink to="/product" class="text-gray-600 hover:text-blue-600">商品列表</RouterLink>
         <span class="mx-2">/</span>
         <span>{{ product.name }}</span>
+      </div>
+      
+      <!-- 購物車訊息提示 -->
+      <div v-if="cartMessage.text" :class="[
+        'mb-4 p-4 rounded-md', 
+        cartMessage.type === 'success' ? 'bg-green-100 text-green-700 border border-green-400' : 'bg-red-100 text-red-700 border border-red-400'
+      ]">
+        {{ cartMessage.text }}
       </div>
       
       <!-- 商品詳情卡片 -->
@@ -122,9 +171,12 @@ watch(() => route.params.route, (newRoute) => {
             
             <div class="flex space-x-4">
               <button 
-                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition duration-300 flex-grow"
+                @click="addToCart"
+                :disabled="addingToCart"
+                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition duration-300 flex-grow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               >
-                加入購物車
+                <span v-if="addingToCart" class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></span>
+                {{ addingToCart ? '處理中...' : '加入購物車' }}
               </button>
               <button 
                 class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition duration-300 flex-grow"

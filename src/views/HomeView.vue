@@ -1,11 +1,46 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRouter } from 'vue-router';
 import productApi from '@/api/productApi';
+import { useCart } from '@/composables/useCart';
 
 const featuredProducts = ref([]);
 const categories = ref([]);
 const isLoading = ref(true);
+const router = useRouter();
+const addingToCart = ref({});
+
+// 使用共享的購物車邏輯
+const { addToCart: addProductToCart } = useCart();
+
+// 加入購物車功能
+const addToCart = async (product) => {
+  try {
+    // 設置正在加入購物車的狀態
+    addingToCart.value[product.id] = true;
+    
+    // 使用共享的購物車函數添加商品
+    const result = await addProductToCart(product.id, 1);
+    
+    if (result.success) {
+      // 顯示成功訊息
+      alert(`已成功將 ${product.name} 加入購物車`);
+    } else {
+      throw new Error('加入購物車失敗');
+    }
+  } catch (error) {
+    console.error('加入購物車失敗:', error);
+    alert('加入購物車失敗，請稍後再試');
+  } finally {
+    // 重置狀態
+    addingToCart.value[product.id] = false;
+  }
+};
+
+// 前往商品詳情
+const goToProductDetail = (productRoute) => {
+  router.push(`/product/${productRoute}`);
+};
 
 onMounted(async () => {
   try {
@@ -73,16 +108,36 @@ onMounted(async () => {
           :key="product.id" 
           class="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition duration-300"
         >
-          <img :src="product.firstPhoto" :alt="product.name" class="w-full h-48 object-cover">
+          <img 
+            :src="product.firstPhoto" 
+            :alt="product.name" 
+            class="w-full h-48 object-cover cursor-pointer"
+            @click="goToProductDetail(product.route)"
+          >
           <div class="p-4">
-            <h3 class="text-lg font-semibold mb-2">{{ product.name }}</h3>
-            <p class="font-bold text-xl mb-3">${{ product.price.toLocaleString() }}</p>
-            <RouterLink 
-              :to="`/product/${product.route}`" 
-              class="block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-300"
+            <h3 
+              class="text-lg font-semibold mb-2 cursor-pointer hover:text-blue-600"
+              @click="goToProductDetail(product.route)"
             >
-              商品詳情
-            </RouterLink>
+              {{ product.name }}
+            </h3>
+            <p class="font-bold text-xl mb-3">${{ product.price.toLocaleString() }}</p>
+            <div class="flex space-x-2">
+              <button 
+                @click="addToCart(product)"
+                :disabled="addingToCart[product.id]"
+                class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-2 rounded transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                <span v-if="addingToCart[product.id]" class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-1"></span>
+                {{ addingToCart[product.id] ? '處理中' : '加入購物車' }}
+              </button>
+              <RouterLink 
+                :to="`/product/${product.route}`" 
+                class="flex-1 block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-2 rounded transition duration-300"
+              >
+                商品詳情
+              </RouterLink>
+            </div>
           </div>
         </div>
       </div>
