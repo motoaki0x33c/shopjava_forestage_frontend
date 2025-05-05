@@ -62,16 +62,15 @@ const fetchCart = async () => {
 // 更新商品數量
 const updateProductQuantity = async (productId, quantity) => {
   try {
-    if (quantity < 1) return;
+    loading.value = true;
+    const token = getStoredToken();
+    if (!token) return;
     
-    // 更新前端顯示（樂觀 UI 更新）
-    const productIndex = cart.value.cartProducts.findIndex(item => item.product.id === productId);
-    if (productIndex !== -1) {
-      cart.value.cartProducts[productIndex].quantity = quantity;
-    }
+    // 呼叫 API 更新購物車商品
+    const response = await cartApi.updateProduct(token, productId, quantity);
     
-    // 實際 API 調用（後端尚未實作，目前僅模擬）
-    await cartApi.updateQuantity(productId, quantity);
+    // 直接使用 API 回傳結果更新購物車資料
+    cart.value = response.data;
     
     // 觸發 storage 事件通知其他組件
     updateStorageEvent();
@@ -79,17 +78,23 @@ const updateProductQuantity = async (productId, quantity) => {
     console.error('更新商品數量錯誤:', err);
     // 發生錯誤時重新獲取購物車資料
     await fetchCart();
+  } finally {
+    loading.value = false;
   }
 };
 
 // 移除商品
 const removeProduct = async (productId) => {
   try {
-    // 樂觀 UI 更新
-    cart.value.cartProducts = cart.value.cartProducts.filter(item => item.product.id !== productId);
+    loading.value = true;
+    const token = getStoredToken();
+    if (!token) return;
     
-    // 實際 API 調用（後端尚未實作，目前僅模擬）
-    await cartApi.removeProduct(productId);
+    // 呼叫 API 將數量設為 0 (相當於刪除商品)
+    const response = await cartApi.updateProduct(token, productId, 0);
+    
+    // 直接使用 API 回傳結果更新購物車資料
+    cart.value = response.data;
     
     // 觸發 storage 事件通知其他組件
     updateStorageEvent();
@@ -97,18 +102,27 @@ const removeProduct = async (productId) => {
     console.error('移除商品錯誤:', err);
     // 發生錯誤時重新獲取購物車資料
     await fetchCart();
+  } finally {
+    loading.value = false;
   }
 };
 
 // 加入購物車
 const addToCart = async (productId, quantity = 1) => {
   try {
-    for (let i = 0; i < quantity; i++) {
-      await cartApi.addProduct(productId);
-    }
+    loading.value = true;
+    const token = getStoredToken();
     
-    // 重新獲取購物車資料
-    await fetchCart();
+    // 呼叫 API 加入商品到購物車
+    const response = await cartApi.addProduct(token, productId, quantity);
+    
+    // 直接使用 API 回傳結果更新購物車資料
+    cart.value = response.data;
+    
+    // 若處理成功，確保將返回的 token 保存
+    if (cart.value.token) {
+      localStorage.setItem('cartToken', cart.value.token);
+    }
     
     // 觸發 storage 事件通知其他組件
     updateStorageEvent();
@@ -117,24 +131,20 @@ const addToCart = async (productId, quantity = 1) => {
   } catch (err) {
     console.error('加入購物車失敗:', err);
     return { success: false, error: err };
+  } finally {
+    loading.value = false;
   }
 };
 
-// 觸發 storage 事件以通知其他組件
+// 使用 localStorage 通知其他分頁更新購物車
 const updateStorageEvent = () => {
-  const token = getStoredToken();
-  if (token) {
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'cartToken',
-      newValue: token
-    }));
-  }
+  localStorage.setItem('cartUpdated', Date.now().toString());
 };
 
 // 設置監聽 storage 事件
 const setupStorageListener = () => {
   const handleStorageChange = (event) => {
-    if (event.key === 'cartToken') {
+    if (event.key === 'cartToken' || event.key === 'cartUpdated') {
       fetchCart();
     }
   };
@@ -147,6 +157,7 @@ const setupStorageListener = () => {
   };
 };
 
+// 暴露需要的函數和狀態
 export function useCart() {
   return {
     cart,
