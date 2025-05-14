@@ -1,6 +1,7 @@
 <script setup>
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { useCart } from '../composables/useCart';
+import orderApi from '../api/orderApi';
 
 // 使用共享的購物車邏輯
 const { 
@@ -14,10 +15,55 @@ const {
   setupStorageListener
 } = useCart();
 
+// 金物流相關狀態
+const paymentAndLogistics = ref({
+  payments: [],
+  logistics: []
+});
+const selectedPayment = ref(null);
+const selectedLogistics = ref(null);
+const finalPrice = ref(0);
+
+// 獲取可用的金流和物流選項
+const fetchPaymentAndLogistics = async () => {
+  try {
+    const { data } = await orderApi.getUsablePaymentAndLogistics();
+    paymentAndLogistics.value = data;
+  } catch (err) {
+    console.error('獲取金物流選項失敗:', err);
+  }
+};
+
+// 計算最終價格
+const computeFinalPrice = async () => {
+  if (!selectedPayment.value || !selectedLogistics.value) return;
+  
+  try {
+    const { data: price } = await orderApi.computeCartPrice(
+      cart.value.token,
+      selectedPayment.value.id,
+      selectedLogistics.value.id
+    );
+    finalPrice.value = price;
+  } catch (err) {
+    console.error('計算價格失敗:', err);
+  }
+};
+
+// 監聽金物流選擇變化
+const handlePaymentChange = () => {
+  computeFinalPrice();
+};
+
+const handleLogisticsChange = () => {
+  computeFinalPrice();
+};
+
 // 掛載時獲取購物車資料並設置監聽器
 let removeListener;
-onMounted(() => {
-  fetchCart();
+onMounted(async () => {
+  await fetchCart();
+  await fetchPaymentAndLogistics();
   removeListener = setupStorageListener();
 });
 
@@ -143,6 +189,44 @@ onUnmounted(() => {
         <div class="bg-white p-6 rounded-lg shadow-md w-full md:w-96">
           <h2 class="text-lg font-semibold mb-4">訂單摘要</h2>
           
+          <!-- 金流選擇 -->
+          <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-2">付款方式</label>
+            <select 
+              v-model="selectedPayment"
+              @change="handlePaymentChange"
+              class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">請選擇付款方式</option>
+              <option 
+                v-for="payment in paymentAndLogistics.payments" 
+                :key="payment.id" 
+                :value="payment"
+              >
+                {{ payment.name }}
+              </option>
+            </select>
+          </div>
+          
+          <!-- 物流選擇 -->
+          <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-2">配送方式</label>
+            <select 
+              v-model="selectedLogistics"
+              @change="handleLogisticsChange"
+              class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">請選擇配送方式</option>
+              <option 
+                v-for="logistics in paymentAndLogistics.logistics" 
+                :key="logistics.id" 
+                :value="logistics"
+              >
+                {{ logistics.name }}
+              </option>
+            </select>
+          </div>
+          
           <div class="space-y-3 mb-6">
             <div class="flex justify-between">
               <span class="text-gray-600">商品數量</span>
@@ -154,22 +238,30 @@ onUnmounted(() => {
             </div>
             <div class="flex justify-between">
               <span class="text-gray-600">運費</span>
-              <span>免運費</span>
+              <span>${{ selectedLogistics ? selectedLogistics.shippingCost : 0 }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600">手續費</span>
+              <span>${{ selectedPayment ? selectedPayment.feeCost : 0 }}</span>
             </div>
           </div>
           
           <div class="border-t pt-4 mb-6">
             <div class="flex justify-between items-center font-bold">
               <span>訂單總金額</span>
-              <span class="text-2xl text-blue-600">${{ totalPrice }}</span>
+              <span class="text-2xl text-blue-600">${{ finalPrice || totalPrice }}</span>
             </div>
           </div>
           
-          <button class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-md font-medium transition">
+          <button 
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-md font-medium transition"
+            :disabled="!selectedPayment || !selectedLogistics"
+            :class="{ 'opacity-50 cursor-not-allowed': !selectedPayment || !selectedLogistics }"
+          >
             前往結帳
           </button>
         </div>
       </div>
     </div>
   </div>
-</template> 
+</template>
