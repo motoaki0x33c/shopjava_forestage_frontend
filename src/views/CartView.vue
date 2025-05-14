@@ -3,6 +3,17 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import { useCart } from '../composables/useCart';
 import orderApi from '../api/orderApi';
 
+// 防抖函數
+const debounce = (fn, delay) => {
+  let timer = null;
+  return (...args) => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      fn.apply(this, args);
+    }, delay);
+  };
+};
+
 // 使用共享的購物車邏輯
 const { 
   cart, 
@@ -10,10 +21,18 @@ const {
   error, 
   totalPrice, 
   fetchCart, 
-  updateProductQuantity, 
+  updateProductQuantity: originalUpdateProductQuantity, 
   removeProduct,
   setupStorageListener
 } = useCart();
+
+// 防抖更新數量的函數
+const updateProductQuantity = debounce(async (productId, quantity) => {
+  await originalUpdateProductQuantity(productId, quantity);
+  if (selectedPayment.value && selectedLogistics.value) {
+    debouncedComputeFinalPrice();
+  }
+}, 500);
 
 // 金物流相關狀態
 const paymentAndLogistics = ref({
@@ -23,6 +42,7 @@ const paymentAndLogistics = ref({
 const selectedPayment = ref(null);
 const selectedLogistics = ref(null);
 const finalPrice = ref(0);
+const isComputing = ref(false);
 
 // 獲取可用的金流和物流選項
 const fetchPaymentAndLogistics = async () => {
@@ -36,9 +56,10 @@ const fetchPaymentAndLogistics = async () => {
 
 // 計算最終價格
 const computeFinalPrice = async () => {
-  if (!selectedPayment.value || !selectedLogistics.value) return;
+  if (!selectedPayment.value || !selectedLogistics.value || isComputing.value) return;
   
   try {
+    isComputing.value = true;
     const { data: price } = await orderApi.computeCartPrice(
       cart.value.token,
       selectedPayment.value.id,
@@ -47,16 +68,21 @@ const computeFinalPrice = async () => {
     finalPrice.value = price;
   } catch (err) {
     console.error('計算價格失敗:', err);
+  } finally {
+    isComputing.value = false;
   }
 };
 
+// 使用防抖包裝計算函數
+const debouncedComputeFinalPrice = debounce(computeFinalPrice, 500);
+
 // 監聽金物流選擇變化
 const handlePaymentChange = () => {
-  computeFinalPrice();
+  debouncedComputeFinalPrice();
 };
 
 const handleLogisticsChange = () => {
-  computeFinalPrice();
+  debouncedComputeFinalPrice();
 };
 
 // 掛載時獲取購物車資料並設置監聽器
@@ -133,24 +159,13 @@ onUnmounted(() => {
               <!-- 數量 -->
               <td class="px-6 py-4">
                 <div class="flex items-center justify-center">
-                  <button 
-                    @click="updateProductQuantity(item.product.id, item.quantity - 1)"
-                    :disabled="item.quantity <= 1"
-                    class="text-gray-500 hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  <input 
+                    type="number" 
+                    v-model.number="item.quantity"
+                    @change="updateProductQuantity(item.product.id, item.quantity)"
+                    min="1"
+                    class="w-20 text-center border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
-                  <span class="mx-2 w-8 text-center">{{ item.quantity }}</span>
-                  <button 
-                    @click="updateProductQuantity(item.product.id, item.quantity + 1)"
-                    class="text-gray-500 hover:text-blue-600"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
                 </div>
               </td>
               
@@ -249,14 +264,15 @@ onUnmounted(() => {
           <div class="border-t pt-4 mb-6">
             <div class="flex justify-between items-center font-bold">
               <span>訂單總金額</span>
-              <span class="text-2xl text-blue-600">${{ finalPrice || totalPrice }}</span>
+              <span v-if="finalPrice" class="text-2xl text-blue-600">${{ finalPrice }}</span>
+              <span v-else class="text-gray-400">請先選擇付款方式與配送方式</span>
             </div>
           </div>
           
           <button 
             class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-md font-medium transition"
-            :disabled="!selectedPayment || !selectedLogistics"
-            :class="{ 'opacity-50 cursor-not-allowed': !selectedPayment || !selectedLogistics }"
+            :disabled="!selectedPayment || !selectedLogistics || !finalPrice"
+            :class="{ 'opacity-50 cursor-not-allowed': !selectedPayment || !selectedLogistics || !finalPrice }"
           >
             前往結帳
           </button>
