@@ -1,7 +1,8 @@
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useCart } from '../composables/useCart';
 import orderApi from '../api/orderApi';
+import logisticsApi from '../api/logisticsApi';
 
 // 防抖函數
 const debounce = (fn, delay) => {
@@ -43,6 +44,108 @@ const selectedPayment = ref(null);
 const selectedLogistics = ref(null);
 const finalPrice = ref(0);
 const isComputing = ref(false);
+
+// 物流相關狀態
+const receiverName = ref('');
+const receiverPhone = ref('');
+const receiverEmail = ref('');
+const receiverAddress = ref('');
+const cvsInfo = ref(null);
+
+// 保存表單資料到 localStorage
+const saveFormData = () => {
+  const formData = {
+    receiverName: receiverName.value,
+    receiverPhone: receiverPhone.value,
+    receiverEmail: receiverEmail.value,
+    receiverAddress: receiverAddress.value,
+    selectedPaymentId: selectedPayment.value?.id,
+    selectedLogisticsId: selectedLogistics.value?.id
+  };
+  localStorage.setItem('cartFormData', JSON.stringify(formData));
+};
+
+// 從 localStorage 恢復表單資料
+const restoreFormData = () => {
+  const savedData = localStorage.getItem('cartFormData');
+  if (savedData) {
+    const formData = JSON.parse(savedData);
+    receiverName.value = formData.receiverName;
+    receiverPhone.value = formData.receiverPhone;
+    receiverEmail.value = formData.receiverEmail;
+    receiverAddress.value = formData.receiverAddress;
+    
+    // 根據 ID 找到對應的金流和物流選項
+    if (formData.selectedPaymentId) {
+      selectedPayment.value = paymentAndLogistics.value.payments.find(
+        p => p.id === formData.selectedPaymentId
+      );
+    }
+    if (formData.selectedLogisticsId) {
+      selectedLogistics.value = paymentAndLogistics.value.logistics.find(
+        l => l.id === formData.selectedLogisticsId
+      );
+    }
+  }
+};
+
+// 監聽表單資料變化
+watch([receiverName, receiverPhone, receiverEmail, receiverAddress], () => {
+  saveFormData();
+});
+
+// 監聽金物流選擇變化
+watch([selectedPayment, selectedLogistics], () => {
+  saveFormData();
+  if (selectedPayment.value && selectedLogistics.value) {
+    debouncedComputeFinalPrice();
+  }
+});
+
+// 解析 URL 中的 cvsInfo 參數
+const parseCvsInfo = () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  let cvsInfoParam = urlParams.get('cvsInfo');
+  if (cvsInfoParam) {
+    try {
+      // 先將 + 號替換為 %2B，避免被解碼為空格
+      cvsInfoParam = cvsInfoParam.replace(' ', '+');
+      const decodedInfo = decodeURIComponent(atob(cvsInfoParam).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      cvsInfo.value = JSON.parse(decodedInfo);
+    } catch (err) {
+      console.error('解析超商資訊失敗:', err);
+    }
+  }
+};
+
+// 顯示超商地圖
+const showCvsMap = async () => {
+  if (!selectedLogistics.value) return;
+  
+  try {
+    // 在跳轉前保存表單資料
+    saveFormData();
+    
+    const { data: mapHtml } = await logisticsApi.showEcpaySelectCvsMap(selectedLogistics.value.id);
+    // 創建一個臨時的 div 來顯示地圖
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = mapHtml;
+    document.body.appendChild(tempDiv);
+    
+    // 找到並提交表單
+    const form = tempDiv.querySelector('form');
+    if (form) {
+      form.submit();
+    }
+    
+    // 清理臨時元素
+    document.body.removeChild(tempDiv);
+  } catch (err) {
+    console.error('顯示超商地圖失敗:', err);
+  }
+};
 
 // 獲取可用的金流和物流選項
 const fetchPaymentAndLogistics = async () => {
@@ -91,11 +194,14 @@ onMounted(async () => {
   await fetchCart();
   await fetchPaymentAndLogistics();
   removeListener = setupStorageListener();
+  parseCvsInfo();
+  restoreFormData();
 });
 
 // 組件卸載時移除監聽器
 onUnmounted(() => {
   if (removeListener) removeListener();
+  localStorage.removeItem('cartFormData');
 });
 </script>
 
@@ -240,6 +346,74 @@ onUnmounted(() => {
                 {{ logistics.name }}
               </option>
             </select>
+          </div>
+
+          <!-- 收件人資訊 -->
+          <div v-if="selectedLogistics" class="mb-6 space-y-4">
+            <h3 class="text-lg font-semibold">收件人資訊</h3>
+            
+            <!-- 姓名 -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">收件人姓名</label>
+              <input 
+                v-model="receiverName"
+                type="text"
+                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+            </div>
+            
+            <!-- 電話 -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">聯絡電話</label>
+              <input 
+                v-model="receiverPhone"
+                type="tel"
+                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+            </div>
+            
+            <!-- Email -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">電子郵件</label>
+              <input 
+                v-model="receiverEmail"
+                type="email"
+                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+            </div>
+            
+            <!-- 超商選擇或地址輸入 -->
+            <div v-if="selectedLogistics.method === 'CVS'">
+              <div v-if="cvsInfo" class="bg-gray-50 p-4 rounded-md">
+                <p class="font-medium">已選擇超商：{{ cvsInfo.cvsName }}</p>
+                <p class="text-sm text-gray-600">{{ cvsInfo.cvsAddress }}</p>
+                <button 
+                  @click="showCvsMap"
+                  class="mt-2 text-blue-600 hover:text-blue-800 text-sm"
+                >
+                  重新選擇超商
+                </button>
+              </div>
+              <button 
+                v-else
+                @click="showCvsMap"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition"
+              >
+                選擇超商
+              </button>
+            </div>
+            <div v-else>
+              <label class="block text-sm font-medium text-gray-700 mb-1">收件地址</label>
+              <input 
+                v-model="receiverAddress"
+                type="text"
+                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+            </div>
           </div>
           
           <div class="space-y-3 mb-6">
