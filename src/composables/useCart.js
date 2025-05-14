@@ -62,7 +62,6 @@ const fetchCart = async () => {
 // 更新商品數量
 const updateProductQuantity = async (productId, quantity) => {
   try {
-    loading.value = true;
     const token = getStoredToken();
     if (!token) return;
     
@@ -78,15 +77,12 @@ const updateProductQuantity = async (productId, quantity) => {
     console.error('更新商品數量錯誤:', err);
     // 發生錯誤時重新獲取購物車資料
     await fetchCart();
-  } finally {
-    loading.value = false;
   }
 };
 
 // 移除商品
 const removeProduct = async (productId) => {
   try {
-    loading.value = true;
     const token = getStoredToken();
     if (!token) return;
     
@@ -102,15 +98,12 @@ const removeProduct = async (productId) => {
     console.error('移除商品錯誤:', err);
     // 發生錯誤時重新獲取購物車資料
     await fetchCart();
-  } finally {
-    loading.value = false;
   }
 };
 
 // 加入購物車
 const addToCart = async (productId, quantity = 1) => {
   try {
-    loading.value = true;
     const token = getStoredToken();
     
     // 呼叫 API 加入商品到購物車
@@ -131,8 +124,6 @@ const addToCart = async (productId, quantity = 1) => {
   } catch (err) {
     console.error('加入購物車失敗:', err);
     return { success: false, error: err };
-  } finally {
-    loading.value = false;
   }
 };
 

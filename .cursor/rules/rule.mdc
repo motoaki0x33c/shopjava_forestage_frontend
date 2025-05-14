@@ -7,3 +7,4 @@ alwaysApply: true
 2. 遵循 Vue 3 最佳實踐
 3. API 請求統一在 `api` 目錄下管理
 4. 購物車相關狀態使用 Pinia 進行管理
+5. 樣式可以使用 tailwindcss

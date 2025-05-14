@@ -197,7 +197,7 @@ onUnmounted(() => {
               @change="handlePaymentChange"
               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">請選擇付款方式</option>
+              <option :value="null">請選擇付款方式</option>
               <option 
                 v-for="payment in paymentAndLogistics.payments" 
                 :key="payment.id" 
@@ -216,7 +216,7 @@ onUnmounted(() => {
               @change="handleLogisticsChange"
               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">請選擇配送方式</option>
+              <option :value="null">請選擇配送方式</option>
               <option 
                 v-for="logistics in paymentAndLogistics.logistics" 
                 :key="logistics.id" 
