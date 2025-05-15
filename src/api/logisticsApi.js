@@ -5,6 +5,6 @@ const api = axios.create({
 });
 
 export default {
-  // 取得綠界超商電子地圖
-  showEcpaySelectCvsMap: (logId) => api.post(`/ecpay/selectCvsMap/${logId}`),
+  // 取得綠界超商電子地圖路徑
+  getCvsMapPath: (logId) => `${api.defaults.baseURL}/ecpay/selectCvsMap/${logId}1`,
 };
