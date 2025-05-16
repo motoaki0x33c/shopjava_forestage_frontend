@@ -11,4 +11,10 @@ export default {
   // 計算購物車總金額（含金物流費用）
   computeCartPrice: (token, paymentId, logisticsId) => 
     api.post('/check/computeCartPrice', { token, paymentId, logisticsId }),
+
+  // 建立訂單
+  createOrder: (orderData) => api.post('/create', orderData),
+
+  // 獲取訂單資料
+  getOrder: (orderNumber) => api.get(`/get/${orderNumber}`),
 };

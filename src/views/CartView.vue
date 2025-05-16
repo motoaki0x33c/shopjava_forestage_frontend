@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useCart } from '../composables/useCart';
 import orderApi from '../api/orderApi';
 import logisticsApi from '../api/logisticsApi';
+import paymentApi from '../api/paymentApi';
 
 // 防抖函數
 const debounce = (fn, delay) => {
@@ -173,6 +174,30 @@ const handlePaymentChange = () => {
 
 const handleLogisticsChange = () => {
   debouncedComputeFinalPrice();
+};
+
+// 前往結帳
+const proceedToCheckout = async () => {
+  if (!selectedPayment.value || !selectedLogistics.value || !finalPrice.value) return;
+
+  try {
+    const orderData = {
+      token: cart.value.token,
+      paymentId: selectedPayment.value.id,
+      logisticsId: selectedLogistics.value.id,
+      customerName: receiverName.value,
+      customerEmail: receiverEmail.value,
+      customerPhone: receiverPhone.value,
+      customerAddress: selectedLogistics.value.method === 'CVS' ? cvsInfo.value.cvsAddress : receiverAddress.value,
+      cvsInfo: selectedLogistics.value.method === 'CVS' ? cvsInfo.value : null
+    };
+
+    const { data: orderNumber } = await orderApi.createOrder(orderData);
+    const paymentPath = paymentApi.getToPaymentPath(orderNumber);
+    window.location.href = paymentPath;
+  } catch (err) {
+    console.error('建立訂單失敗:', err);
+  }
 };
 
 // 掛載時獲取購物車資料並設置監聽器
@@ -434,6 +459,7 @@ onUnmounted(() => {
             class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-md font-medium transition"
             :disabled="!selectedPayment || !selectedLogistics || !finalPrice"
             :class="{ 'opacity-50 cursor-not-allowed': !selectedPayment || !selectedLogistics || !finalPrice }"
+            @click="proceedToCheckout"
           >
             前往結帳
           </button>
