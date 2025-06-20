@@ -35,6 +35,11 @@ const router = createRouter({
       name: 'orderFailed',
       component: () => import('../views/OrderFailedView.vue')
     },
+    {
+      path: '/order/search',
+      name: 'orderSearch',
+      component: () => import('../views/OrderSearchView.vue')
+    },
   ],
 })
 
