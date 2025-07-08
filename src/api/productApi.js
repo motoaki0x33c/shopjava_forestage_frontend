@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8080/product',
+  baseURL: import.meta.env.VITE_API_CART_BASE_URL + 'product',
 });
 
 export default {
