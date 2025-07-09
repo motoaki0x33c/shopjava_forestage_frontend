@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRoute, RouterLink } from 'vue-router';
 import productApi from '@/api/productApi';
+import { useCart } from '@/composables/useCart';
 
 const route = useRoute();
 const products = ref([]);
@@ -9,14 +10,35 @@ const categories = ref([]);
 const isLoading = ref(true);
 const selectedCategory = ref('');
 const searchQuery = ref('');
+const addingToCart = ref({});
+const { addToCart: addProductToCart } = useCart();
+
+// 加入購物車功能
+const addToCart = async (product) => {
+  try {
+    addingToCart.value[product.id] = true;
+    const result = await addProductToCart(product.id, 1);
+    if (result.success) {
+      alert(`已成功將 ${product.name} 加入購物車`);
+    } else {
+      throw new Error('加入購物車失敗');
+    }
+  } catch (error) {
+    console.error('加入購物車失敗:', error);
+    alert('加入購物車失敗，請稍後再試');
+  } finally {
+    addingToCart.value[product.id] = false;
+  }
+};
 
 onMounted(async () => {
   try {
     const [productsResponse] = await Promise.all([
       productApi.getProducts(),
     ]);
-    
     products.value = productsResponse.data;
+    // 自動整理分類
+    categories.value = Array.from(new Set(products.value.map(p => p.category))).filter(Boolean);
     isLoading.value = false;
   } catch (error) {
     console.error('獲取數據失敗:', error);
@@ -122,9 +144,12 @@ const filteredProducts = computed(() => {
               查看詳情
             </RouterLink>
             <button 
-              class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-300"
+              @click="addToCart(product)"
+              :disabled="addingToCart[product.id]"
+              class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              加入購物車
+              <span v-if="addingToCart[product.id]" class="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-1"></span>
+              {{ addingToCart[product.id] ? '處理中' : '加入購物車' }}
             </button>
           </div>
         </div>
