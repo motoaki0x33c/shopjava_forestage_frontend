@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_CART_BASE_URL + '/pay',
+  baseURL: import.meta.env.VITE_API_BASE_URL + '/pay',
 });
 
 export default {
