@@ -41,8 +41,9 @@ const addToCart = async (product) => {
 const goToProductDetail = (productRoute) => {
   router.push(`/product/${productRoute}`);
 };
-
+console.log('HomeView setup start');
 onMounted(async () => {
+  console.log('HomeView onMounted');
   try {
     const [productsResponse] = await Promise.all([
       productApi.getProducts(),
