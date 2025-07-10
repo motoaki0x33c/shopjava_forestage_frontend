@@ -194,7 +194,7 @@ const proceedToCheckout = async () => {
 
     const { data: orderNumber } = await orderApi.createOrder(orderData);
     const paymentPath = paymentApi.getToPaymentPath(orderNumber);
-    $('body').html(paymentPath);
+    window.location.href = paymentPath;
   } catch (err) {
     console.error('建立訂單失敗:', err);
   }
